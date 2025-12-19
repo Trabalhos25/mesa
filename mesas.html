@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Pedidos por Mesa</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f3f4f6;
+    padding: 20px;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.mesa {
+    background: white;
+    border-radius: 16px;
+    padding: 15px;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    border: 3px solid transparent;
+}
+
+.mesa.ativa {
+    border-color: #a81111;
+    background: #c25f5f;
+}
+
+.mesa h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+.item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.total {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px;
+    border: none;
+    border-radius: 10px;
+    background: #16a34a;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #15803d;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🪑 Pedidos por Mesa</h1>
+
+<div class="container">
+
+    <div class="mesa" id="mesa1">
+        <h2>Mesa 1</h2>
+    </div>
+
+    <div class="mesa" id="mesa2">
+        <h2>Mesa 2</h2>
+    </div>
+
+    <div class="mesa" id="mesa3">
+        <h2>Mesa 3</h2>
+    </div>
+
+</div>
+
+<script>
+let mesas = JSON.parse(localStorage.getItem("mesas")) || {
+    mesa1: [],
+    mesa2: [],
+    mesa3: []
+};
+
+function carregarMesa(id) {
+    const div = document.getElementById(id);
+    div.innerHTML = `<h2>${div.querySelector("h2")?.textContent || id}</h2>`;
+
+    const pedidos = mesas[id];
+
+    if (pedidos.length > 0) {
+        div.classList.add("ativa");
+    } else {
+        div.classList.remove("ativa");
+    }
+
+    pedidos.forEach(pedido => {
+        pedido.itens.forEach(item => {
+            const linha = document.createElement("div");
+            linha.className = "item";
+            linha.innerHTML = `<span>${item.nome}</span><span>R$ ${item.preco}</span>`;
+            div.appendChild(linha);
+        });
+
+        const total = document.createElement("div");
+        total.className = "total";
+        total.textContent = "Total: R$ " + pedido.total.toFixed(2);
+        div.appendChild(total);
+        div.appendChild(document.createElement("hr"));
+    });
+
+    if (pedidos.length > 0) {
+        const btn = document.createElement("button");
+        btn.textContent = "✅ Finalizar Mesa";
+        btn.onclick = () => finalizarMesa(id);
+        div.appendChild(btn);
+    }
+}
+
+function finalizarMesa(id) {
+    if (!confirm("Finalizar pedidos da " + id + "?")) return;
+
+    mesas[id] = [];
+    localStorage.setItem("mesas", JSON.stringify(mesas));
+
+    carregarTodas();
+}
+
+function carregarTodas() {
+    carregarMesa("mesa1");
+    carregarMesa("mesa2");
+    carregarMesa("mesa3");
+}
+
+carregarTodas();
+</script>
+
+</body>
+</html>
