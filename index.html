@@ -1,148 +1,179 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Pedidos por Mesa</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>Painel da Cozinha - Pedidos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f3f4f6;
-    padding: 20px;
-}
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+            margin: 0;
+        }
 
-.container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-}
+        h1 { text-align: center; color: #1a1a1a; }
 
-.mesa {
-    background: white;
-    border-radius: 16px;
-    padding: 15px;
-    box-shadow: 0 6px 14px rgba(0,0,0,0.1);
-    border: 3px solid transparent;
-}
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
 
-.mesa.ativa {
-    border-color: #a81111;
-    background: #c25f5f;
-}
+        .mesa {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            border-top: 8px solid #ccc;
+        }
 
-.mesa h2 {
-    margin-top: 0;
-    text-align: center;
-}
+        /* Quando houver pedido, a mesa fica vermelha e vibrante */
+        .mesa.ativa {
+            border-top-color: #e74c3c;
+            background: #fff5f5;
+        }
 
-.item {
-    display: flex;
-    justify-content: space-between;
-    font-size: 14px;
-}
+        .mesa h2 { margin: 0 0 15px 0; font-size: 1.2rem; }
 
-.total {
-    margin-top: 10px;
-    font-weight: bold;
-}
+        .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.95rem;
+        }
 
-button {
-    width: 100%;
-    margin-top: 10px;
-    padding: 8px;
-    border: none;
-    border-radius: 10px;
-    background: #16a34a;
-    color: white;
-    cursor: pointer;
-    font-weight: bold;
-}
+        .total-container {
+            margin-top: 15px;
+            padding-top: 10px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: flex;
+            justify-content: space-between;
+        }
 
-button:hover {
-    background: #15803d;
-}
-</style>
+        .btn-concluir {
+            width: 100%;
+            margin-top: 15px;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #27ae60;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .btn-concluir:hover { background: #219150; }
+    </style>
 </head>
-
 <body>
 
-<h1>🪑 Pedidos por Mesa</h1>
+<h1>👨‍🍳 Painel da Cozinha</h1>
 
 <div class="container">
-
-    <div class="mesa" id="mesa1">
-        <h2>Mesa 1</h2>
-    </div>
-
-    <div class="mesa" id="mesa2">
-        <h2>Mesa 2</h2>
-    </div>
-
-    <div class="mesa" id="mesa3">
-        <h2>Mesa 3</h2>
-    </div>
-
+    <div class="mesa" id="mesa1"><h2>MESA 1</h2></div>
+    <div class="mesa" id="mesa2"><h2>MESA 2</h2></div>
+    <div class="mesa" id="mesa3"><h2>MESA 3</h2></div>
 </div>
 
-<script>
-let mesas = JSON.parse(localStorage.getItem("mesas")) || {
-    mesa1: [],
-    mesa2: [],
-    mesa3: []
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, getDocs, deleteDoc, writeBatch 
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+   const firebaseConfig = {
+  apiKey: "AIzaSyAQy_vxGowwbjptqbGVYp_-_wa1eUYKvxE",
+  authDomain: "cliente-mesa.firebaseapp.com",
+  projectId: "cliente-mesa",
+  storageBucket: "cliente-mesa.firebasestorage.app",
+  messagingSenderId: "1026287310268",
+  appId: "1:1026287310268:web:6557abdd6eb37b861fc7b9"
 };
 
-function carregarMesa(id) {
-    const div = document.getElementById(id);
-    div.innerHTML = `<h2>${div.querySelector("h2")?.textContent || id}</h2>`;
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-    const pedidos = mesas[id];
+    /* 🟢 EXPLICAÇÃO DO PROFESSOR:
+       Usamos o onSnapshot para criar um "túnel" de comunicação. 
+       Sempre que algo mudar na subcoleção 'itens' daquela mesa, o Firebase "empurra"
+       os dados novos para cá instantaneamente.
+    */
+    function ouvirMesa(mesaId) {
+        const mesaDiv = document.getElementById(mesaId);
+        const colRef = collection(db, "pedidos", mesaId, "itens");
 
-    if (pedidos.length > 0) {
-        div.classList.add("ativa");
-    } else {
-        div.classList.remove("ativa");
-    }
+        onSnapshot(colRef, (snapshot) => {
+            // Limpa a div mas mantém o título
+            mesaDiv.innerHTML = `<h2>${mesaId.toUpperCase()}</h2>`;
+            let somaTotal = 0;
 
-    pedidos.forEach(pedido => {
-        pedido.itens.forEach(item => {
-            const linha = document.createElement("div");
-            linha.className = "item";
-            linha.innerHTML = `<span>${item.nome}</span><span>R$ ${item.preco}</span>`;
-            div.appendChild(linha);
+            if (snapshot.empty) {
+                mesaDiv.classList.remove("ativa");
+                mesaDiv.innerHTML += "<p style='color: #999;'>Aguardando pedidos...</p>";
+                return;
+            }
+
+            mesaDiv.classList.add("ativa");
+
+            snapshot.forEach(doc => {
+                const item = doc.data();
+                somaTotal += item.preco;
+
+                const div = document.createElement("div");
+                div.className = "item";
+                div.innerHTML = `<span>${item.nome}</span> <span>R$ ${item.preco.toFixed(2)}</span>`;
+                mesaDiv.appendChild(div);
+            });
+
+            // Adiciona o total da comanda
+            const totalDiv = document.createElement("div");
+            totalDiv.className = "total-container";
+            totalDiv.innerHTML = `<span>TOTAL:</span> <span>R$ ${somaTotal.toFixed(2)}</span>`;
+            mesaDiv.appendChild(totalDiv);
+
+            // Botão para limpar a mesa (concluir atendimento)
+            const btn = document.createElement("button");
+            btn.className = "btn-concluir";
+            btn.innerText = "✅ CONCLUIR PEDIDO";
+            btn.onclick = () => finalizarMesa(mesaId);
+            mesaDiv.appendChild(btn);
         });
-
-        const total = document.createElement("div");
-        total.className = "total";
-        total.textContent = "Total: R$ " + pedido.total.toFixed(2);
-        div.appendChild(total);
-        div.appendChild(document.createElement("hr"));
-    });
-
-    if (pedidos.length > 0) {
-        const btn = document.createElement("button");
-        btn.textContent = "✅ Finalizar Mesa";
-        btn.onclick = () => finalizarMesa(id);
-        div.appendChild(btn);
     }
-}
 
-function finalizarMesa(id) {
-    if (!confirm("Finalizar pedidos da " + id + "?")) return;
+    /* 🔴 EXPLICAÇÃO DO PROFESSOR:
+       Para limpar a mesa, precisamos deletar cada documento dentro da subcoleção.
+       Usamos um 'WriteBatch' (Lote de Escrita) para fazer isso de uma vez só,
+       o que é mais eficiente e seguro.
+    */
+    window.finalizarMesa = async function(mesaId) {
+        if(confirm(`Deseja limpar os pedidos da ${mesaId.toUpperCase()}?`)) {
+            try {
+                const colRef = collection(db, "pedidos", mesaId, "itens");
+                const snapshot = await getDocs(colRef);
+                const batch = writeBatch(db);
 
-    mesas[id] = [];
-    localStorage.setItem("mesas", JSON.stringify(mesas));
+                snapshot.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
 
-    carregarTodas();
-}
+                await batch.commit();
+                console.log("Mesa finalizada!");
+            } catch (error) {
+                console.error("Erro ao finalizar:", error);
+            }
+        }
+    }
 
-function carregarTodas() {
-    carregarMesa("mesa1");
-    carregarMesa("mesa2");
-    carregarMesa("mesa3");
-}
-
-carregarTodas();
+    // Inicializa os ouvintes
+    ouvirMesa("mesa1");
+    ouvirMesa("mesa2");
+    ouvirMesa("mesa3");
 </script>
 
 </body>
